@@ -1,6 +1,18 @@
+#secrets
 .env
 .env.*
+!.env.example
+
+#Go
+backend/backend
+*.test
+*.out
+
+# node/react
 node_modules/
 dist/
+*.log
+
+# OS/editor
 .DS_Store
-backend/backend
+.idea/
