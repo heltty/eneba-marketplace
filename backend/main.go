@@ -8,16 +8,40 @@ import (
 	"os"
 	_"github.com/jackc/pgx/v5/stdlib"
 )
-type ProductItem struct {
+type Product struct {
 	ID int `json:"id"`
 	Title string `json:"title"`
 	Platform string `json:"platform"`
-	PriceCents int `json:"priceCents"`
 }
-func productHandler(w http.ResponseWriter, r *http.Request){
-	items := []ProductItem{{1, "Elden Ring", "PC", 6000}, {2, "Hades", "PlayStation 4", 2500}, {3, "Stardew Valley", "Nintendo Switch", 1500}}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(items)
+func productsHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		rows, err := db.QueryContext(r.Context(),
+			"SELECT id, title, platform FROM products ORDER BY id")
+		if err != nil {
+			log.Println("query products:", err)
+			http.Error(w, "database error", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close();
+
+		products := []Product{}
+		for rows.Next() {
+			var p Product
+			if err := rows.Scan(&p.ID, &p.Title, &p.Platform); err != nil {
+				log.Println("scan product:", err)
+				http.Error(w, "database error", http.StatusInternalServerError)
+				return
+			}
+			products = append(products, p)
+		}
+		if err := rows.Err(); err != nil {
+			log.Println("rows products:", err)
+			http.Error(w, "database error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(products)
+	}
 }
 func main() {
 	dsn := os.Getenv("DATABASE_URL")
@@ -35,7 +59,7 @@ func main() {
 	}
 	log.Println("connected to database")
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/products", productHandler)
+	mux.HandleFunc("GET /api/products", productsHandler(db))
 	log.Println("listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
